@@ -1,0 +1,5 @@
+{
+  "name": "ChefAI - 智能烹饪助手",
+  "description": "您的私人AI大厨，提供食谱灵感、烹饪指导和营养建议。",
+  "requestFramePermissions": ["camera"]
+}

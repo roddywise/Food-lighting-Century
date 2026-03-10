@@ -1,0 +1,56 @@
+@import url('https://fonts.font.im/css2?family=Outfit:wght@100..900&family=Inter:wght@100..900&display=swap');
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-display: "Outfit", sans-serif;
+  --font-sans: "Inter", sans-serif;
+  
+  --color-brand-cream: var(--bg-color, #fffcf5);
+  --color-brand-olive: var(--primary-color, #f59e0b);
+  --color-brand-clay: var(--secondary-color, #ea580c);
+  --color-brand-text: var(--text-color, #451a03);
+  --color-brand-ink: var(--ink-color, #1c1917);
+  --color-brand-surface: var(--surface-color, #ffffff);
+  --color-brand-muted: var(--muted-color, #d97706);
+  --color-brand-border: var(--border-color, #fef3c7);
+  
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+
+  --animate-blob: blob 7s infinite;
+  @keyframes blob {
+    0% { transform: translate(0px, 0px) scale(1); }
+    33% { transform: translate(30px, -50px) scale(1.1); }
+    66% { transform: translate(-20px, 20px) scale(0.9); }
+    100% { transform: translate(0px, 0px) scale(1); }
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-brand-cream text-brand-text font-sans min-h-screen relative overflow-x-hidden antialiased;
+  }
+  
+  h1, h2, h3, h4 {
+    @apply font-display text-brand-ink tracking-tight;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/45 backdrop-blur-3xl border border-white/60;
+    box-shadow: 
+      0 8px 32px 0 rgba(255, 255, 255, 0.4),
+      0 8px 32px 0 rgba(31, 38, 135, 0.05),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  }
+  
+  .liquid-blob {
+    @apply absolute rounded-full filter blur-[120px] opacity-40 animate-blob;
+  }
+}
+
+.markdown-body {
+  @apply prose max-w-none;
+  @apply prose-headings:font-display prose-headings:font-semibold prose-headings:tracking-tight;
+}
