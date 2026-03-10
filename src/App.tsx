@@ -138,28 +138,12 @@ export default function App() {
       const data: Recipe[] = JSON.parse(response.text || '[]');
       
       // 为每个食谱生成匹配的 AI 图片
-      const recipesWithImages = await Promise.all(data.map(async (recipe) => {
-        try {
-          const imgResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: {
-              parts: [{ text: `Professional food photography of ${recipe.title}, high resolution, appetizing, gourmet style` }]
-            }
-          });
-          
-          let imageUrl = '';
-          for (const part of imgResponse.candidates?.[0]?.content?.parts || []) {
-            if (part.inlineData) {
-              imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-              break;
-            }
-          }
-          return { ...recipe, imageUrl };
-        } catch (err) {
-          console.error("Image generation failed for", recipe.title, err);
-          return { ...recipe, imageUrl: `https://picsum.photos/seed/${recipe.title}/800/600` };
-        }
-      }));
+      const recipesWithImages = data.map((recipe) => {
+        const genImgKey = import.meta.env.VITE_GEN_IMG_KEY || '';
+        const prompt = `Professional food photography of ${recipe.title}, high resolution, appetizing, gourmet style`;
+        const imageUrl = `https://api.eachother.work/generate/roddygenimg?key=${genImgKey}&prompts=${encodeURIComponent(prompt)}`;
+        return { ...recipe, imageUrl };
+      });
 
       setRecipes(recipesWithImages);
       setView('home');
@@ -488,7 +472,7 @@ export default function App() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: idx * 0.1 }}
                       onClick={() => handleRecipeSelect(recipe)}
-                      className="group cursor-pointer glass rounded-3xl overflow-hidden hover:shadow-2xl hover:shadow-brand-primary/20 transition-all duration-500"
+                      className="group cursor-pointer glass rounded-3xl overflow-hidden transition-all duration-500"
                     >
                       <div className="aspect-[4/3] bg-brand-surface relative overflow-hidden">
                         <img 
@@ -808,7 +792,7 @@ export default function App() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: idx * 0.1 }}
                       onClick={() => handleRecipeSelect(recipe)}
-                      className="group cursor-pointer glass rounded-3xl overflow-hidden hover:shadow-2xl hover:shadow-brand-primary/20 transition-all duration-500"
+                      className="group cursor-pointer glass rounded-3xl overflow-hidden transition-all duration-500"
                     >
                       <div className="aspect-[4/3] bg-brand-surface relative overflow-hidden">
                         <img 
