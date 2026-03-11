@@ -27,7 +27,8 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const generateText = async (prompt: string) => {
-  const url = `/api/generate/text?prompts=${encodeURIComponent(prompt)}`;
+  const key = import.meta.env.VITE_GEN_TXT_KEY || '';
+  const url = `https://api.eachother.work/generate/roddygentext?key=${key}&prompts=${encodeURIComponent(prompt)}`;
   const response = await fetch(url);
   if (!response.ok) throw new Error('Text generation failed');
   return await response.text();
@@ -93,29 +94,18 @@ export default function App() {
     if (ingredients.length === 0) return;
     setIsGenerating(true);
     try {
-      const prompt = `基于以下食材，生成3个创意食谱。食材：${ingredients.join(', ')}。请严格以JSON格式返回一个数组，不要包含任何Markdown标记。JSON结构应为Recipe数组，每个Recipe包含id, title, description, ingredients (name, amount), instructions (string array), cookingTime, difficulty, nutrition (calories, protein, carbs, fat)。`;
+      const prompt = `基于以下食材，生成3个创意食谱。食材：${ingredients.join(', ')}。请严格以JSON格式返回，不要包含任何Markdown标记。JSON结构应为Recipe数组，每个Recipe包含id, title, description, ingredients (name, amount), instructions (string array), cookingTime, difficulty, nutrition (calories, protein, carbs, fat)。`;
       const text = await generateText(prompt);
       
       // Clean up the text in case the model adds markdown code blocks
       const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      let data = JSON.parse(cleanedText || '[]');
-      
-      // Handle case where model might wrap the array in an object
-      if (!Array.isArray(data) && typeof data === 'object' && data !== null) {
-        const possibleArray = Object.values(data).find(val => Array.isArray(val));
-        if (possibleArray) {
-          data = possibleArray;
-        }
-      }
-
-      if (!Array.isArray(data)) {
-        throw new Error("API returned invalid data format (expected array)");
-      }
+      const data: Recipe[] = JSON.parse(cleanedText || '[]');
       
       // 为每个食谱生成匹配的 AI 图片
-      const recipesWithImages = data.map((recipe: any) => {
+      const recipesWithImages = data.map((recipe) => {
+        const genImgKey = import.meta.env.VITE_GEN_IMG_KEY || '';
         const prompt = `Professional food photography of ${recipe.title}, high resolution, appetizing, gourmet style`;
-        const imageUrl = `/api/generate/image?prompts=${encodeURIComponent(prompt)}`;
+        const imageUrl = `https://api.eachother.work/generate/roddygenimg?key=${genImgKey}&prompts=${encodeURIComponent(prompt)}`;
         return { ...recipe, imageUrl };
       });
 
