@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, Type } from "@google/genai";
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChefHat, 
@@ -27,7 +26,13 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const generateText = async (prompt: string) => {
+  const key = import.meta.env.VITE_GEN_TXT_KEY || '';
+  const url = `https://api.eachother.work/generate/roddygentext?key=${key}&prompts=${encodeURIComponent(prompt)}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Text generation failed');
+  return await response.text();
+};
 
 export default function App() {
   const { palette } = useDynamicTheme();
@@ -89,53 +94,12 @@ export default function App() {
     if (ingredients.length === 0) return;
     setIsGenerating(true);
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `基于以下食材，生成3个创意食谱。食材：${ingredients.join(', ')}。请以JSON格式返回。`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                id: { type: Type.STRING },
-                title: { type: Type.STRING },
-                description: { type: Type.STRING },
-                ingredients: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      name: { type: Type.STRING },
-                      amount: { type: Type.STRING }
-                    },
-                    required: ["name", "amount"]
-                  }
-                },
-                instructions: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING }
-                },
-                cookingTime: { type: Type.STRING },
-                difficulty: { type: Type.STRING },
-                nutrition: {
-                  type: Type.OBJECT,
-                  properties: {
-                    calories: { type: Type.STRING },
-                    protein: { type: Type.STRING },
-                    carbs: { type: Type.STRING },
-                    fat: { type: Type.STRING }
-                  }
-                }
-              },
-              required: ["id", "title", "description", "ingredients", "instructions", "cookingTime", "difficulty"]
-            }
-          }
-        }
-      });
-
-      const data: Recipe[] = JSON.parse(response.text || '[]');
+      const prompt = `基于以下食材，生成3个创意食谱。食材：${ingredients.join(', ')}。请严格以JSON格式返回，不要包含任何Markdown标记。JSON结构应为Recipe数组，每个Recipe包含id, title, description, ingredients (name, amount), instructions (string array), cookingTime, difficulty, nutrition (calories, protein, carbs, fat)。`;
+      const text = await generateText(prompt);
+      
+      // Clean up the text in case the model adds markdown code blocks
+      const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      const data: Recipe[] = JSON.parse(cleanedText || '[]');
       
       // 为每个食谱生成匹配的 AI 图片
       const recipesWithImages = data.map((recipe) => {
@@ -149,6 +113,7 @@ export default function App() {
       setView('home');
     } catch (error) {
       console.error("Error generating recipes:", error);
+      alert("生成食谱失败，请重试。");
     } finally {
       setIsGenerating(false);
     }
@@ -177,11 +142,9 @@ export default function App() {
     if (cookingTips) return;
     setIsLoadingTips(true);
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: "请提供5条实用的家庭烹饪技巧，涵盖食材处理、火候控制和调味建议。请以Markdown格式返回。"
-      });
-      setCookingTips(response.text || '暂无技巧建议。');
+      const prompt = "请提供5条实用的家庭烹饪技巧，涵盖食材处理、火候控制和调味建议。请以Markdown格式返回。";
+      const text = await generateText(prompt);
+      setCookingTips(text || '暂无技巧建议。');
     } catch (error) {
       console.error("Tips error:", error);
     } finally {
@@ -203,14 +166,9 @@ export default function App() {
     setIsChatting(true);
 
     try {
-      const chat = ai.chats.create({
-        model: "gemini-3-flash-preview",
-        config: {
-          systemInstruction: `你是一个专业的烹饪助手。正在协助用户烹饪：${selectedRecipe?.title || '一道菜'}。请提供简洁、专业的烹饪建议。`
-        }
-      });
-      const response = await chat.sendMessage({ message: userMsg });
-      setChatMessages(prev => [...prev, { role: 'model', text: response.text || '抱歉，我没听清。' }]);
+      const prompt = `你是一个专业的烹饪助手。正在协助用户烹饪：${selectedRecipe?.title || '一道菜'}。请提供简洁、专业的烹饪建议。用户问题：${userMsg}`;
+      const text = await generateText(prompt);
+      setChatMessages(prev => [...prev, { role: 'model', text: text || '抱歉，我没听清。' }]);
     } catch (error) {
       console.error("Chat error:", error);
     } finally {
@@ -219,41 +177,8 @@ export default function App() {
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsAnalyzingImage(true);
-    try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Data = (reader.result as string).split(',')[1];
-        
-        const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { inlineData: { data: base64Data, mimeType: file.type } },
-                { text: "请识别图片中的所有食材，只返回食材名称，用逗号分隔。例如：番茄, 鸡蛋, 牛肉" }
-              ]
-            }
-          ]
-        });
-
-        const text = response.text || '';
-        const detected = text.split(/[,，]/).map(s => s.trim()).filter(s => s.length > 0);
-        const newIngredients = Array.from(new Set([...ingredients, ...detected]));
-        setIngredients(newIngredients);
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      console.error("Image analysis error:", error);
-      alert("图片识别失败，请重试。");
-    } finally {
-      setIsAnalyzingImage(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
+    alert("由于 API 限制，图片识别功能目前不可用。请手动输入食材。");
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSmartMatch = async () => {
@@ -263,15 +188,11 @@ export default function App() {
     }
     setIsMatching(true);
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `我目前有这些食材：${ingredients.join(', ')}。请推荐3-5种能与这些食材完美搭配的其他食材，只返回食材名称，用逗号分隔。`
-      });
+      const prompt = `我目前有这些食材：${ingredients.join(', ')}。请推荐3-5种能与这些食材完美搭配的其他食材，只返回食材名称，用逗号分隔。`;
+      const text = await generateText(prompt);
 
-      const text = response.text || '';
       const suggestions = text.split(/[,，]/).map(s => s.trim()).filter(s => s.length > 0);
       
-      // 模拟一个选择弹窗或直接添加
       if (confirm(`AI 建议搭配：${suggestions.join('、')}。是否全部添加？`)) {
         setIngredients(Array.from(new Set([...ingredients, ...suggestions])));
       }
